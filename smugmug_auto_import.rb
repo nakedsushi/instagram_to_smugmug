@@ -6,25 +6,24 @@ require 'open-uri'
 require 'mail'
 require 'yaml'
 
-options = YAML.load_file('config.yml')
+@options = YAML.load_file('config.yml')
 
-
-tag = options['tag'] || 'smugmug'
-user_id = options['instagram_id'] || 216881
-MIN_FILENAME = "min_id_#{user_id}.txt"
-smugmug_subject = '#' + tag
+@tag = @options['tag'] || 'smugmug'
+@user_id = @options['instagram_id'] || 216881
+@min_filename = "min_id_#{@user_id}.txt"
+@smugmug_subject = '#' + @tag
 
 def read_min_id
   id = ''
-  if File.exists?(MIN_FILENAME)
-    file = File.open(MIN_FILENAME, "rb")
+  if File.exists?(@min_filename)
+    file = File.open(@min_filename, "rb")
     id = file.read
   end
   return id
 end
 
 def write_min_id(id)
-  File.open(MIN_FILENAME, 'w+') { |file| file.write(id) }
+  File.open(@min_filename, 'w+') { |file| file.write(id) }
 end
 
 def download_image(url)
@@ -36,10 +35,12 @@ def download_image(url)
 end
 
 def email_smugmug(file, caption)
+  from_email = @options['from_email']
+  to_email = @options['smugmug_email']
   mail = Mail.new do
-    from options['from_email']
-    to options['smugmug_email']
-    subject smugmug_subject
+    from from_email
+    to to_email
+    subject @smugmug_subject
     body caption
     add_file file
   end
@@ -48,14 +49,14 @@ def email_smugmug(file, caption)
   mail.deliver
 end
 
-min_id = read_min_id
+@min_id = read_min_id
 
-url = "https://api.instagram.com/v1/users/#{user_id}/media/recent/" +
-  '?access_token=' + options['access_token'] +
+url = "https://api.instagram.com/v1/users/#{@user_id}/media/recent/" +
+  '?access_token=' + @options['access_token'] +
   "&count=10"
 
-if !min_id.empty?
-  url += "&min_id=#{min_id}"
+if !@min_id.empty?
+  url += "&min_id=#{@min_id}"
 end
 
 uri = URI.parse(url)
@@ -74,19 +75,19 @@ begin
 rescue Exception => e
   return
 end
-min_id = min_id.to_i
+@min_id = @min_id.to_i
 
 content['data'].each do |data|
   tags = data['tags']
   id = data['id'].split('_').first.to_i
-  if id > min_id
-    min_id = id
-    if tags.include?(tag)
+  if id > @min_id
+    @min_id = id
+    if tags.include?(@tag)
       img_url = data['images']['standard_resolution']['url']
       file = download_image(img_url)
       email_smugmug(file, data['caption']['text'])
     end
-    write_min_id(min_id)
+    write_min_id(@min_id)
   end
 end
 
